@@ -16,7 +16,7 @@ type
     ccNone, ccGcc, ccCLang
 
   Action* = enum
-    atNone, atC, atCpp, atNative
+    atNone, atC, atCpp, atNative, atWasm
 
   ConfigRef* {.acyclic.} = ref object ## every global configuration
     cCompiler*: SystemCC
@@ -54,5 +54,5 @@ template getCompilerConfig*(config: ConfigRef): (string, string) =
   else:
     quit "unreachable"
 
-const ExtAction*: array[Action, string] = ["", ".c", ".cpp", ".S"]
+const ExtAction*: array[Action, string] = ["", ".c", ".cpp", ".S", ".wasm"]
 

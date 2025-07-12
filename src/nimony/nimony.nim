@@ -29,6 +29,7 @@ Usage:
   nimony [options] [command]
 Command:
   c project.nim               compile the full project
+  wasm project.nim            compile the full project to wasm
   m file.nim [project.nim]    compile a single Nim module to hexer
 
 Options:
@@ -89,6 +90,7 @@ proc handleCmdLine() =
   var checkModes = DefaultSettings
   var forwardArgsToExecutable = false
   var executableArgs = ""
+  var target = "c"
   for kind, key, val in getopt():
     case kind
     of cmdArgument:
@@ -98,6 +100,9 @@ proc handleCmdLine() =
           cmd = SingleModule
         of "c":
           cmd = FullProject
+        of "wasm":
+          cmd = FullProject
+          target = "wasm"
         else:
           quit "command expected"
       else:
@@ -223,7 +228,7 @@ proc handleCmdLine() =
     # compile full project modules
     buildGraph config, args[0], forceRebuild, silentMake,
       commandLineArgs, commandLineArgsNifc, moduleFlags, (if doRun: DoRun else: DoCompile),
-      passC, passL, executableArgs
+      passC, passL, executableArgs, target
 
 when isMainModule:
   handleCmdLine()

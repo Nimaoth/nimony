@@ -20,6 +20,9 @@ else:
 when defined(enableAsm):
   import amd64 / genasm
 
+when defined(enableWasm) or true:
+  import wasm/genwasm
+
 const
   Version = "0.2"
   Usage = "NIFC Compiler. Version " & Version & """
@@ -28,7 +31,7 @@ const
 Usage:
   nifc [options] [command] [arguments]
 Command:
-  c|cpp|n file.nif [file2.nif]    convert NIF files to C|C++|ASM
+  c|cpp|n|wasm file.nif [file2.nif]    convert NIF files to C|C++|ASM
 
 Options:
   -r, --run                 run the makefile and the compiled program
@@ -97,6 +100,10 @@ proc handleCmdLine() =
         currentAction = atNative
         if not hasKey(actionTable, atNative):
           actionTable[atNative] = @[]
+      of "wasm":
+        currentAction = atWasm
+        if not hasKey(actionTable, atWasm):
+          actionTable[atWasm] = @[]
       else:
         case currentAction
         of atC:
@@ -105,6 +112,8 @@ proc handleCmdLine() =
           actionTable[atCpp].add key
         of atNative:
           actionTable[atNative].add key
+        of atWasm:
+          actionTable[atWasm].add key
         of atNone:
           quit "invalid command: " & key
     of cmdLongOption, cmdShortOption:
@@ -174,6 +183,14 @@ proc handleCmdLine() =
               generateAsm inp, s.config.nifcacheDir / outp
           else:
             quit "wasn't built with native target support"
+      of atWasm:
+        let args = actionTable[action]
+        if args.len == 0:
+          quit "command takes a filename"
+        else:
+          for inp in items args:
+            let outp = s.config.nifcacheDir / splitFile(inp).name.mangleFileName & ".wasm"
+            generateWasm inp, outp
       of atNone:
         quit "targets are not specified"
 
