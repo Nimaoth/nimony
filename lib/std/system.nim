@@ -179,6 +179,7 @@ include "system/setops"
 
 include "system/ctypes"
 
+include "system/exits"
 include "system/atomintrin"
 include "system/memory"
 include "system/seqimpl"
@@ -231,7 +232,9 @@ func chr*(u: range[0..255]): char {.inline.} =
   ## Converts `u` to a `char`, same as `char(u)`.
   char(u.int)
 
-include "../../vendor/errorcodes/src" / errorcodes
+include "system/formatfloat"
+
+include "errorcodes/errorcodes"
 
 var localErr* {.threadvar.}: ErrorCode
 

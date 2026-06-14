@@ -26,7 +26,7 @@ Usage:
   hastur [options] [command] [arguments]
 
 Commands:
-  build [all|nimony|nifler|hexer|nifc|shoggoth|nifmake|nj|vl|validator|dagon|pnak]   build selected tools (default: all).
+  build [all|nimony|nifler|hexer|nifc|shoggoth|nifmake|nj|vl|validator|dagon|pnak|arkham|nifasm|native]   build selected tools (default: all).
   tiers                compile every module on the bootstrap list with nimony.
   boot [options]       Self-host the *full* nimony toolchain (nimony,
                        nimsem, hexer). `bin0/` is a fresh copy of the
@@ -1114,6 +1114,20 @@ proc buildShoggoth(showProgress = false) =
   let exe = "shoggoth".addFileExt(ExeExt)
   robustMoveFile "src/nifc/shoggoth/" & exe, binDir() / exe
 
+proc buildArkham(showProgress = false) =
+  ## `arkham` (NIFC -> typed asm-NIF native codegen) lives in the sibling
+  ## `../nativenif` repo and reuses nimony's NIF libraries via its committed
+  ## sibling-relative `nim.cfg`. We assume the checkout exists (the `dist/`
+  ## auto-clone is a later step). arkham's own `nim.cfg` already sets
+  ## `--outdir:bin`; we pass it explicitly so the result is deterministic
+  ## regardless of the current directory.
+  exec nimcPrefix() & "--outdir:" & binDir() & " ../nativenif/src/arkham/arkham.nim", showProgress
+
+proc buildNifasm(showProgress = false) =
+  ## `nifasm` (asm-NIF -> static, libc-free ELF/Mach-O/PE executable; also the
+  ## linker) — sibling repo, same assume-exists arrangement as `buildArkham`.
+  exec nimcPrefix() & "--outdir:" & binDir() & " ../nativenif/src/nifasm/nifasm.nim", showProgress
+
 proc buildHexer(showProgress = false) =
   exec nimcPrefix() & "src/hexer/hexer.nim", showProgress
   let exe = "hexer".addFileExt(ExeExt)
@@ -1569,29 +1583,6 @@ proc execNifc(cmd: string) =
 proc execHexer(cmd: string) =
   exec "hexer", cmd
 
-proc nifctests(overwrite: bool) =
-  let t1 = "tests/nifc/selectany/t1.nif"
-  let t2 = "tests/nifc/selectany/t2.nif"
-  let t3 = "tests/nifc/selectany/t3.nif"
-  execNifc " c -r " & t1 & " " & t2 & " " & t3
-  let app = "tests/nifc/app.c.nif"
-  execNifc " c -r " & app
-
-  let hello = "tests/nifc/hello.nif"
-  execNifc " c -r " & hello
-  execNifc " c -r --opt:speed " & hello
-  execNifc " c -r --opt:size " & hello
-  # TEST CPP
-  execNifc " cpp -r " & hello
-  execNifc " cpp -r --opt:speed " & hello
-
-  let tryIssues = "tests/nifc/try.nif"
-  execNifc " cpp -r " & tryIssues
-
-  let issues = "tests/nifc/issues.nif"
-  execNifc " c -r --linedir:on " & issues
-  execNifc " cpp -r --linedir:off " & issues
-
 proc hexertests(overwrite: bool) =
   let mod1 = "tests/hexer/mod1"
   let helloworld = "tests/hexer/hexer_helloworld"
@@ -1863,6 +1854,14 @@ proc handleCmdLine =
     for a in items(args):
       if bootArgs.len > 0: bootArgs.add ' '
       bootArgs.add quoteShell(a)
+    # `--forward:<flag>` is appended verbatim to every stage's `nimony c`
+    # command line. Unlike positional `args`, getopt keeps the value intact
+    # (dashes and all), so this is the way to forward flags like
+    # `-d:nimNativeAlloc` that must survive unmangled into nimony (and thus
+    # into nimsem, where the `when defined(...)` is evaluated).
+    if forward.len > 0:
+      if bootArgs.len > 0: bootArgs.add ' '
+      bootArgs.add forward
     bootCmd(bootArgs, withValgrind)
 
   of "selfcheck":
@@ -1910,6 +1909,18 @@ proc handleCmdLine =
       buildNifc(showProgress)
     of "shoggoth":
       buildShoggoth(showProgress)
+    of "arkham":
+      buildArkham(showProgress)
+    of "nifasm":
+      buildNifasm(showProgress)
+    of "native":
+      # The C-free native toolchain used by `nimony n`: arkham + nifasm (from
+      # the sibling `../nativenif`) plus shoggoth (the opt-gated NIFC optimizer
+      # that also feeds the native path). Kept out of the default `all` build so
+      # the sibling-repo dependency stays opt-in.
+      buildArkham(showProgress)
+      buildNifasm(showProgress)
+      buildShoggoth(showProgress)
     of "hexer":
       buildHexer(showProgress)
     of "nifmake":
@@ -1936,7 +1947,6 @@ proc handleCmdLine =
     exampletests(overwrite, forward)
   of "nifc":
     buildNifc()
-    nifctests(overwrite)
 
   of "hexer":
     buildHexer()
